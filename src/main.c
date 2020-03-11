@@ -1,4 +1,6 @@
 #include "neighborhood_search.h"
+#include "kernel.h"
+#include <math.h>
 
 int NPTS = 100;
 
@@ -35,6 +37,7 @@ void fillData(GLfloat(* data)[8])
 		data[i][7] = 0.8f; // transparency
 	}
 }
+
 int main()
 {
 	GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
