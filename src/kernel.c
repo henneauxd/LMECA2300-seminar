@@ -83,7 +83,7 @@ double grad_w_cubic(double distance, double kh, double d)
         else {
             if (q > 2) {
                 weight = 0;
-                printf("too big distance ");
+                //printf("too big distance ");
             }
             else {
                 weight = (-0.5 * pow((2 - q), 2) * d) / (pow(h, 2) * q);

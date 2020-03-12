@@ -1,5 +1,6 @@
 #include "neighborhood_search.h"
 #include "kernel.h"
+#include "checkDerivatives.h"
 #include <math.h>
 
 int NPTS = 100;
@@ -27,14 +28,28 @@ static void colormap(float v, float color[3])
 void fillData(GLfloat(* data)[8])
 {
 	float rmax = 100.0 * sqrtf(2.0f);
+// 	for (int i = 0; i < NPTS; i++) {
+// 		data[i][0] = rand() * 200.0 / RAND_MAX - 100.0; // x (rand between -100 and 100)
+// 		data[i][1] = rand() * 200.0 / RAND_MAX - 100.0; // y (rand between -100 and 100)
+// 		double r = sqrt(data[i][0] * data[i][0] + data[i][1] * data[i][1]);
+// 		data[i][2] = rand() * 2.0 / RAND_MAX - 1.0; //Random starting speed
+// 		data[i][3] = rand() * 2.0 / RAND_MAX - 1.0; //Random starting speed
+// 		colormap(r / rmax, &data[i][4]); // fill color
+// 		data[i][7] = 0.8f; // transparency
+// 	}
+	double x_lim[2] = {-1.0, 1.0};
 	for (int i = 0; i < NPTS; i++) {
-		data[i][0] = rand() * 200.0 / RAND_MAX - 100.0; // x (rand between -100 and 100)
-		data[i][1] = rand() * 200.0 / RAND_MAX - 100.0; // y (rand between -100 and 100)
-		double r = sqrt(data[i][0] * data[i][0] + data[i][1] * data[i][1]);
-		data[i][2] = rand() * 2.0 / RAND_MAX - 1.0; //Random starting speed
-		data[i][3] = rand() * 2.0 / RAND_MAX - 1.0; //Random starting speed
-		colormap(r / rmax, &data[i][4]); // fill color
-		data[i][7] = 0.8f; // transparency
+	  double coord[2] = {data[i][0], data[i][1]};
+	  double values[2] = {0.0,0.0};
+	  double mass = 1.0;
+	  double density = 1.0;
+	  
+	  init1DSegmentWithParticles(x_lim, coord, values, &mass, &density, NPTS, i, 1);
+	  double r = sqrt(data[i][0] * data[i][0] + data[i][1] * data[i][1]);
+	  data[i][2] = 0.0; //Random starting speed
+	  data[i][3] = 0.0; //Random starting speed
+	  colormap(r / rmax, &data[i][4]); // fill color
+	  data[i][7] = 0.8f; // transparency
 	}
 }
 
@@ -47,20 +62,33 @@ int main()
 	//printf(" %u \n", seed);
 	srand(seed);
 	fillData(data);
-
-	double timestep = 0.5;
-	double maxspeed = 1;
+	
+	double timestep = 0.0;
+	double maxspeed = 0.0;
 	neighborhood_options* options = neighborhood_options_init(timestep, maxspeed);
 	neighborhood* nh = options->nh;
-	int number_of_iterations = 10;
-	for (int iterations = 0; iterations < number_of_iterations;iterations++) {
-		if(iterations)
-			bouncyrandomupdate(data, timestep, options->half_length, maxspeed);
-		neighborhood_update(options, nh, data, iterations);
-		//kernel(data, nh, kh);
-	}
+	neighborhood_update(options, nh, data, 0);
+	
+	mySingleParticle* my_array_of_particles = create_array_of_particles(NPTS, 1, nh);
+// 	computeDerivativesOfParticleQuantity(my_array_of_particles, 1);
+	computeDerivatiesAllParticles(my_array_of_particles, NPTS);
+
 	neighborhood_options_delete(options,nh);
 
+// 	double timestep = 0.5;
+// 	double maxspeed = 1;
+// 	neighborhood_options* options = neighborhood_options_init(timestep, maxspeed);
+// 	neighborhood* nh = options->nh;
+// 	int number_of_iterations = 10;
+// 	for (int iterations = 0; iterations < number_of_iterations;iterations++) {
+// 		if(iterations)
+// 			bouncyrandomupdate(data, timestep, options->half_length, maxspeed);
+// 		neighborhood_update(options, nh, data, iterations);
+// 		//kernel(data, nh, kh);
+// 	}
+// 	neighborhood_options_delete(options,nh);
+
 	free(data);
+	free(my_array_of_particles);
 	return EXIT_SUCCESS;
 }
