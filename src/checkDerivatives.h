@@ -2,10 +2,11 @@
 #define __CHECKDERIVATIES__
 
 #include "BOV.h"
-#include "kernel.h"
 #include "neighborhood_search.h"
+#include "kernel.h"
 #include <time.h>
 #include <math.h>
+#include <stdbool.h>
 
 enum fieldNames {
   Density = 1,
@@ -13,6 +14,19 @@ enum fieldNames {
   Pressure = 3,
   Temperature = 4
 };
+
+typedef enum particleType {
+  ON_BOUNDARY = 1,
+  IN_DOMAIN = 2,
+} particleType;
+
+typedef enum kernelType {
+  CUBIC = 1,
+  LUCY = 2,
+  QUARTIC = 3,
+  QUINTIC = 4
+} kernelType;
+
 
 typedef struct singleParticleDerivatives {
   double* divergence;
@@ -26,21 +40,60 @@ typedef struct mySingleParticle {
   int size_values;
   double mass;
   double density;
+
   neighborhood_options* particle_neighbours; // all the neighbouring particles infos related to the particle of interest
   singleParticleDerivatives* particle_derivatives; // divergence, gradient and laplacian (depending if the quantity carried by the particle is a scalar or vector)
 } mySingleParticle;
 
+typedef struct allParticles {
+  mySingleParticle* array_of_particles;
+  int nb_particles;
+  int* index_part_in_domain; // array of the indices of all particles inside the domain
+  int* index_part_on_boundaries; // array of the indices of all particles on the boundaries
+//   int* index_part_global; // array of the indices of all particles (domain + boundaries)
+} allParticles;
+
+// Create an array of particles "mySingleParticle" by initializing the different 
 mySingleParticle* create_array_of_particles(int nbParticles, int size_values, neighborhood* nh);
 
+allParticles* create_all_particles(int* nbParticles, double* domain_lim, int size_values, neighborhood* nh,  particleType partType, double* args_init_fct, double (*f_init)(double*, double*));
+
+allParticles* create_particles_in_domain(int* nbParticles, double* domain_lim, int size_values, double* args_init_fct, double (*f_init)(double*, double*), int starting_index);
+
+allParticles* create_particles_on_boundaries(int* nbParticles, double* boundaries_lim, int size_values, int nbBoundaries, double* value_on_boundaries, int starting_index); 
+
+// Initialize the elements of a singleParticleDerivatives
 singleParticleDerivatives* initialize_particle_derivatives(int size_values);
 
+// Assign coordinates, values, mass and density to one particle located on a 1-D segment whose limits are in x_lim, with index "index_art". 
 void init1DSegmentWithParticles(double* x_lim, double* coord, double* values, double* mass, double* density, int nb_particles, int index_part, int size_values);
-// void init1DSegmentWithParticles(GLfloat(* data)[14], double* x_lim, int nb_particles, double (*myFun)(double));
 
+void initValuesParticles(double* coord, double *values, double* args, int size_values, double (*f)(double*, double*));
+
+void initSquareWithParticles(double* x_lim, double* coord, double* values, double* mass, double* density, int nbPart_x, int nbPart_y, int index_x, int index_y, int size_values);
+
+// Function assigning the values of the quantity carried by each particle based on the coordinates
 double myFunctionToDerive(double* x);
 
-void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_part);
+double initFunction(double* x, double* args); 
 
-void computeDerivatiesAllParticles(mySingleParticle* myPart, int nbParticles);
+// Compute the derivatives (divergence, gradients, laplacian) of a single particle with index "index_part"
+// ---> Use for that the functions implemented in "neighborhood_search" and "kernel" 
+void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_part, kernelType kType);
+
+// Loop on all particles and compute the derivatives of the quantity for each of them
+void computeDerivatiesAllParticles(mySingleParticle* myPart, int nbParticles, kernelType kType);
+
+void computeDerivativesAllParticles(allParticles* myPart, kernelType kType);
+
+void delete_all_particles(allParticles* myPart);
+
+void neighborhood_update_new(neighborhood_options* options, neighborhood* nh, allParticles* myPart, int iterations);
+
+allParticles* combine_two_particles_sets(allParticles* part1, allParticles* part2, particleType pType1, particleType pType2);
+
+void clone_single_particle (mySingleParticle* part1, mySingleParticle* part2);
+
+void integrate_equation(allParticles* part, double dt, double alpha);
 
 #endif
