@@ -8,6 +8,11 @@
 #include <math.h>
 #include <stdbool.h>
 
+#define M_PI 3.14159265358979323846
+
+extern int NPTS_DOMAIN;
+extern int NPTS_BOUNDARIES;
+
 enum fieldNames {
   Density = 1,
   Velocity = 2,
@@ -77,6 +82,8 @@ double myFunctionToDerive(double* x);
 
 double initFunction(double* x, double* args); 
 
+double initFunction_GaussianSource(double* x, double* args);
+
 // Compute the derivatives (divergence, gradients, laplacian) of a single particle with index "index_part"
 // ---> Use for that the functions implemented in "neighborhood_search" and "kernel" 
 void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_part, kernelType kType);
@@ -94,6 +101,16 @@ allParticles* combine_two_particles_sets(allParticles* part1, allParticles* part
 
 void clone_single_particle (mySingleParticle* part1, mySingleParticle* part2);
 
+void associate_neighborhood_to_particles(allParticles* part, neighborhood* nh);
+
 void integrate_equation(allParticles* part, double dt, double alpha);
+
+double solution_Fourier_series_Gaussian_source(double *x_coord, double time, double* args_fct_init, int nb_terms);
+
+double get_A_mn_series_Gaussian_source(int m, int n, double* args_fct_init);
+
+double get_integration_Gaussian_source(int m, double x_c, double length_x, double sigma);
+
+double fct_integration_Gaussian_source(double x, int m, double x_c, double length_x, double sigma);
 
 #endif

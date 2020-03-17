@@ -708,17 +708,17 @@ void neighborhood_update_new(neighborhood_options* options, neighborhood* nh, al
 // 			printf("distance = %2.6f \n", distance);
 			if (distance <= kh && index_i != index_j) {
 				neighbours_new(index_j, nh, index_i, distance, !iterations, 0);
-				myPart->array_of_particles[index_i].particle_neighbours->nh = nh;
+// 				myPart->array_of_particles[index_i].particle_neighbours->nh = nh;
 				if (use_improved_method)
 					neighbours_new(index_i, nh, index_j, distance, 0, 0);
-					myPart->array_of_particles[index_j].particle_neighbours->nh = nh;
+// 					myPart->array_of_particles[index_j].particle_neighbours->nh = nh;
 			}
 			else if (use_verlet && !iterations && distance <= (kh + L) && index_i != index_j) {
 				neighbours_new(index_j, nh, index_i, distance, !iterations, 1);
-				myPart->array_of_particles[index_i].particle_neighbours->nh = nh;
+// 				myPart->array_of_particles[index_i].particle_neighbours->nh = nh;
 				if (use_improved_method)
 					neighbours_new(index_i, nh, index_j, distance, 0, 1);
-					myPart->array_of_particles[index_j].particle_neighbours->nh = nh;
+// 					myPart->array_of_particles[index_j].particle_neighbours->nh = nh;
 			}
 			if (use_verlet && iterations) {
 				if (checking_neighbours.next) {

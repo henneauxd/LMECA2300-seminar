@@ -224,8 +224,10 @@ void initSquareWithParticles(double* x_lim, double* coord, double* values, doubl
 //   // function values
 //   values[0] = myFunctionToDerive(coord);//(myFun)(&x_coord);
 //   if (size_values > 1) values[1] = 0.0; // 1-D segment so don't care about the second dimension
-  *mass = 1.0;
-  *density = *mass / (delta_x*delta_y);//WARNING: only valid for cartesian grid of particle! 
+  /**mass = 1.0;
+  *density = *mass / (delta_x*delta_y);//WARNING: only valid for cartesian grid of particle!*/ 
+  *density = 1.0;
+  *mass = *density * (delta_x*delta_y);
 }
 
 void initValuesParticles(double* coord, double *values, double* args, int size_values, double (*f)(double*, double*)) {
@@ -273,8 +275,10 @@ void init1DSegmentWithParticles(double* x_lim, double* coord, double* values, do
     printf("Only able to treat horizontal or vertical boundaries for the moment"); 
   }
   
-  *mass = 1.0;
-  *density = *mass / (delta*delta); 
+  /**mass = 1.0;
+  *density = *mass / (delta*delta);*/ 
+  *density = 1.0;
+  *mass = *density * (delta*delta);
 }
 
 double myFunctionToDerive(double* x) 
@@ -285,7 +289,21 @@ double myFunctionToDerive(double* x)
 double initFunction(double* x, double* args) 
 {
    double value_to_be_imposed = args[0];
-   return value_to_be_imposed; 
+   return value_to_be_imposed;
+//    return x[0]*x[0];
+}
+
+double initFunction_GaussianSource(double* x_coord, double* args) 
+{
+   double intensity = args[0];
+   double sigma = args[1];
+   double x_0 = args[2];
+   double y_0 = args[3];
+   double x = x_coord[0];
+   double y = x_coord[1];
+   double arg_exp = (1/(2*sigma*sigma))*((x-x_0)*(x-x_0) + (y-y_0)*(y-y_0));
+   return intensity* exp(-arg_exp);
+//    return x[0]*x[0];
 }
 
 void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_part, kernelType kType) {
@@ -338,7 +356,9 @@ void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_pa
 	// d^2/dx^2 value_k + d^2/dy^2 value_k
 	laplacian_part[k] += 2.0 * (myPart[index_j].mass / myPart[index_j].density) * (local_part->values[k] - myPart[index_j].values[k]) * (d_x_ij * weight_x + d_y_ij * weight_y) /(d_ij*d_ij);
       }
-//       if (index_part == 25) printf("laplacian_part[k] = %2.6f \n",laplacian_part[0]);
+//       if (index_part == 10 && d_ij == 0) printf("index_j = %d \n", index_j);
+//       double test = 2.0 * (myPart[index_j].mass / myPart[index_j].density) * (local_part->values[0] - myPart[index_j].values[0]) * (d_x_ij * weight_x + d_y_ij * weight_y) /(d_ij*d_ij);
+//       if (index_part == 5) printf("laplacian_part[k] = %2.6f \n",  d_ij);//laplacian_part[0]);
       
       List = List->next;
   }
@@ -373,19 +393,19 @@ void computeDerivativesAllParticles(allParticles* myPart, kernelType kType) {
   // WARNING: this routine only valid for scalar quantity for the moment
 //   printf("\ni  (X,Y)			f(x)		Grad_x			Grad_y			Laplacian\n\n");
   int* index_in_domain = myPart->index_part_in_domain;
-  int nbPart = 100;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
+  int nbPart = 50*50;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
   for (int i=0; i<nbPart; i++) {
       int local_index = index_in_domain[i];
       computeDerivativesOfParticleQuantity(myPart->array_of_particles, local_index, kType);
 //       double* x = myPart->array_of_particles[i].coordinates;
 //       double* grad = myPart->array_of_particles[i].particle_derivatives->gradient;
 //       double* lapl = myPart->array_of_particles[local_index].particle_derivatives->laplacian;
-//       if (lapl[0] != 0) printf("lapl = %2.6f \n ", lapl[0]);
 //       double value = myPart->array_of_particles[i].values[0];
-      // Just print one line of particle along the x-direction 
-//       if (x[1] > 0.0 && x[1] < 0.1) {
+     // Just print one line of particle along the x-direction 
+//       if (x[1] > 0.5 && x[1] < 0.55) {
 // 	printf("%d  (%2.3f,%2.3f)		%2.6f        %2.6f		%2.6f		%2.6f\n",i,x[0],x[1],value,grad[0],grad[1],lapl[0]);
 //       }
+//       printf(">>>>>>>>>>>> i = %d \n", i);
      }  
 } 
 
@@ -445,18 +465,41 @@ void clone_single_particle (mySingleParticle* part1, mySingleParticle* part2) {
  
 }
 
-// void associate_neighborhood_to_particles(allParticles* part, neighborhood* nh) {
-//   
-//   
-// }
+void associate_neighborhood_to_particles(allParticles* part, neighborhood* nh) {
+  int* index_part_domain = NULL;
+  int* index_part_boundary = NULL;
+  
+   
+  
+  int nbPart_domain = 50*50;//NPTS_DOMAIN;
+  int nbPart_boundary = 4*100;//NPTS_BOUNDARIES;
+  
+  if(part->index_part_in_domain) { 
+    index_part_domain = part->index_part_in_domain;
+    for (int i=0; i<nbPart_domain; i++) {
+      int local_index = index_part_domain[i];
+      part->array_of_particles[local_index].particle_neighbours->nh = &(nh[local_index]);
+    }
+  }
+  
+  if(part->index_part_on_boundaries) {
+    index_part_boundary = part->index_part_on_boundaries;
+    for (int i=0; i<nbPart_boundary; i++) {
+      int local_index = index_part_boundary[i];
+      part->array_of_particles[local_index].particle_neighbours->nh = &(nh[local_index]);
+    }
+  }
+  
+}
 
 
 void integrate_equation(allParticles* part, double dt, double alpha) {
   int* index_in_domain = part->index_part_in_domain;
-  int nbPart = 100;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
+  int nbPart = 50*50;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
   for (int i = 0; i<nbPart; i++) {
       int local_index = index_in_domain[i];
       part->array_of_particles[local_index].values[0] += dt*alpha*part->array_of_particles[local_index].particle_derivatives->laplacian[0];
+      
       if (part->array_of_particles[local_index].size_values > 1) {
 	part->array_of_particles[local_index].values[1] += dt*alpha*part->array_of_particles[local_index].particle_derivatives->laplacian[1];
       }
@@ -464,6 +507,58 @@ void integrate_equation(allParticles* part, double dt, double alpha) {
 }
 
 
+double solution_Fourier_series_Gaussian_source(double *x_coord, double time, double* args_fct_init, int nb_terms) {
+    double x = x_coord[0];
+    double y = x_coord[1];
+    double length_x = 1.0;
+    double length_y = 1.0;
+    double T = 0.0;
+    for (int m=0; m<nb_terms; m++) {
+	for (int n=0; n<nb_terms; n++) {
+	    double A_mn = get_A_mn_series_Gaussian_source(m,n, args_fct_init);
+	    double lambda_mn = M_PI*M_PI*((m*m/(length_x*length_x)) + (n*n/(length_y*length_y)));
+	    T += A_mn * sin((m*M_PI*x)/length_x) * sin((n*M_PI*y)/length_y) * exp(-lambda_mn * time); 
+	}
+    }
+    return T;
+}
+
+double get_A_mn_series_Gaussian_source(int m, int n, double* args_fct_init) {
+  double length_x = 1.0;
+  double length_y = 1.0;
+  double intensity = args_fct_init[0];
+  double sigma = args_fct_init[1];
+  double x_c = args_fct_init[2];
+  double y_c = args_fct_init[3];
+  double first_integr = get_integration_Gaussian_source(m, x_c, length_x, sigma);
+  double second_integr = get_integration_Gaussian_source(n, y_c, length_y, sigma);
+
+  double A_mn = ((4*intensity) / (length_x*length_y)) * first_integr * second_integr;
+  
+  return A_mn;
+}
+
+double get_integration_Gaussian_source(int m, double x_c, double length_x, double sigma) {
+  int n = 50;
+  double a = 0.0;
+  double b = length_x;
+  double h=fabs(length_x-0.0)/n;
+  double sum = 0;
+  for(int i=1;i<n;i++){
+    double x = a + i*h;
+    sum=sum + fct_integration_Gaussian_source(x, m, x_c, length_x, sigma);
+  }
+  double integral = (h/2)*(fct_integration_Gaussian_source(a, m, x_c, length_x, sigma)+fct_integration_Gaussian_source(b, m, x_c, length_x, sigma)+2*sum);
+  
+  return integral;
+  
+}
+
+double fct_integration_Gaussian_source(double x, int m, double x_c, double length_x, double sigma) {
+  double term1 = exp((-1.0/(2*sigma*sigma))*(x-x_c)*(x-x_c));
+  double term2 = sin((m*M_PI*x)/length_x);
+  return term1*term2;
+}
 
 
 

@@ -3,9 +3,13 @@
 #include "checkDerivatives.h"
 #include <math.h>
 
-static int NPTS_BOUNDARIES = 10;
-static int NPTS_DOMAIN = 10*10;
-int NPTS = 10*10 + 4*10;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
+// static int NPTS_BOUNDARIES = 10;
+// static int NPTS_DOMAIN = 10*10;
+// int NPTS = 10*10 + 4*10;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
+
+int NPTS_BOUNDARIES = 100;
+int NPTS_DOMAIN = 50*50;
+int NPTS = 50*50 + 4*100;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
 
 // for v, a floating point value between 0 and 1, this function fills color with
 // the improved jet colormap color corresponding to v
@@ -72,7 +76,7 @@ void fillData(GLfloat(* data)[8])
 // // 	  printf("data[i][0] = %2.6f \n",data[i][0]);
 // 	}
 	
-	double x_lim[4] = {-1.0, 1.0, -1.0, 1.0};
+	double x_lim[4] = {0.0, 1.0, 0.0, 1.0};
 	int i=0;
 	int nbPart_x = sqrt(NPTS);
 	int nbPart_y = nbPart_x;
@@ -92,7 +96,7 @@ void fillData(GLfloat(* data)[8])
 	    
 	    data[i][2] = 0.0; 
 	    data[i][3] = 0.0;
-	    double r = sqrt(values[0] * values[0]+ values[1] * values[1]);
+	    double r = values[0];//sqrt(values[0] * values[0]+ values[1] * values[1]);
 	    myColormap(r, &data[i][4], 2.0, -2.0); // fill color
 	    data[i][7] = 0.8f; // transparency
 	    
@@ -170,7 +174,7 @@ void draw_particles(double* x_lim, GLfloat(* data)[8]) {
 
       /* we got 0.2 at the top to write something. The screen goes from -1 to 1 */
       bov_text_t* msg =  bov_text_new(
-	      (GLubyte[]) {"df/dx"},
+	      (GLubyte[]) {"Temperature field"},
 	      GL_STATIC_DRAW);
       bov_text_set_pos(msg, (GLfloat[2]){-0.95, 0.82});
       bov_text_set_fontsize(msg, 0.1);
@@ -216,20 +220,37 @@ void create_window_animation(GLfloat(* data)[8], bov_window_t* window, bov_point
 
       /* we got 0.2 at the top to write something. The screen goes from -1 to 1 */
       bov_text_t* msg =  bov_text_new(
-	      (GLubyte[]) {"df/dx"},
+	      (GLubyte[]) {"Temperature field"},
 	      GL_STATIC_DRAW);
       bov_text_set_pos(msg, (GLfloat[2]){-0.95, 0.82});
       bov_text_set_fontsize(msg, 0.1);
+//       while(!bov_window_should_close(window)){
+      double tbegin = bov_window_get_time(window);
+      while (bov_window_get_time(window) - tbegin < 2.0) {
+	  bov_particles_draw(window, particles, 0, BOV_TILL_END);
+	  bov_text_draw(window, msg);
+	  // In your actual project, don't wait for events => bov_window_update(window)
+// 	  bov_window_update_and_wait_events(window);
+	      bov_window_update(window);
+      }
 }
 
-void display_particles(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles) {
-  float transition_time = 1.0; 
-  particles = bov_particles_update(particles,data,NPTS);
+void display_particles(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles, int end) {
+  float transition_time = 1.0;
+  bov_points_t* new_particles = bov_particles_update(particles,data,NPTS);
   bov_window_t* new_window = window;
-  double tbegin = bov_window_get_time(window);
-  while (bov_window_get_time(window) - tbegin < transition_time) {
-    bov_particles_draw(window, particles, 0, BOV_TILL_END);
-    bov_window_update(window);
+  double tbegin = bov_window_get_time(new_window);
+  if (!end) {
+    while (bov_window_get_time(new_window) - tbegin < transition_time) {
+      bov_particles_draw(new_window, new_particles, 0, BOV_TILL_END);
+      bov_window_update(new_window);
+    }
+  }
+  else {
+    while (!bov_window_should_close(new_window)) {
+      bov_particles_draw(new_window, new_particles, 0, BOV_TILL_END);
+      bov_window_update_and_wait_events(new_window);
+    }
   }
 }
 
@@ -288,22 +309,112 @@ int main()
 // 	return EXIT_SUCCESS;
   
   
+//   // ***********************************************************************************************
+//   // ************************** LAPLACIAN COMPUTATION VERIFICATION **********************
+//   // ***********************************************************************************************
+//   
+//       // Creation of neighborhoods
+// //     GLfloat(*data_bis)[8] = malloc(sizeof(data_bis[0]) * NPTS);
+// //     fillData(data_bis);
+// //     double timestep = 0.0;
+// //     double maxspeed = 0.0;
+// //     neighborhood_options* options = neighborhood_options_init(timestep, maxspeed);
+// //     neighborhood* nh = options->nh;
+// //     neighborhood_update(options, nh, data_bis, 0);
+//     // *** 1 *** ASSIGN POSITIONS, DENSITY, AND MASS TO EVERY PARTICLES (neighbourhoods not yet defined) + BOUNDARY CONDITIONS
+//   
+//     // Creation of particles in the domain
+//     int nbParticles_domain[2] = {(int) sqrt(NPTS_DOMAIN), (int) sqrt(NPTS_DOMAIN)}; // number of particles in each direction (WARNING: same number of particles should be chosen for the moment)
+//     double dx = 0.0;//0.5* 1.0 / ((double)sqrt(NPTS_DOMAIN) - 1.0);
+//     double domain_lim[4] = {0.0+dx,1.0-dx,0.0+dx,1.0-dx}; // limits of the computational domain
+//     int starting_index_part_in_domain = 0;
+//     double args_init_function[1] = {0.0}; // value of the temperature to be imposed everywhere in the domain. This argument is passed to the "initFunction" routine which will specify the values of each particle quantity
+//     int size_values = 1; // scalar temperature field with a single component
+//     
+//     allParticles* particles_everywhere = create_particles_in_domain(nbParticles_domain, domain_lim, size_values, args_init_function, initFunction, starting_index_part_in_domain);
+//     
+// //     // Creation of particles on the boundaries
+// //     int nbBoundaries = 4;
+// //     int nbParticles_boundaries[4] = {NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES}; // number of particles on each boundary (WARNING: same number of particles should be chosen for the moment)
+// //     double boundaries_lim[4][4] = {{0.0, 0.0, 0.0, 1.0},
+// // 				   {0.0, 1.0, 1.0, 1.0},
+// // 				   {1.0, 1.0, 0.0, 1.0},
+// // 				   {0.0, 1.0, 0.0, 0.0}};
+// //     int starting_index_part_on_bound = NPTS_DOMAIN;
+// //     double values_Dirichlet[4] = {0.0, 0.0, 0.0, 100.0}; 
+// //     
+// //     allParticles* particles_on_boundaries = NULL;//create_particles_on_boundaries(nbParticles_boundaries, (double *)boundaries_lim, size_values, nbBoundaries, values_Dirichlet, starting_index_part_on_bound);
+//     
+//     // Assemble the particles in the domain and on the boundaries in a single structure, for the computation of the neighbourhoods just after
+// //     allParticles* particles_everywhere = particles_in_domain;//combine_two_particles_sets(particles_in_domain, particles_on_boundaries, IN_DOMAIN, ON_BOUNDARY);
+//     
+//     GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
+//     CHECK_MALLOC(data);
+//     double extrema[2] = {0.0, 2.0};
+//     myFillData(data, particles_everywhere, extrema);
+// //     draw_particles(domain_lim, data);
+//     
+//     
+//     // *** 2 *** CREATION OF THE NEIGHBOURHOODS OF EACH PARTICLE (in the domain and on the boundaries)
+//     
+//     // Creation of neighborhoods
+//     double timestep = 0.0;
+//     double maxspeed = 0.0;
+//     neighborhood_options* options = neighborhood_options_init(timestep, maxspeed);
+//     neighborhood* nh = options->nh;
+//     neighborhood_update_new(options, nh, particles_everywhere, 0);
+//     
+// //     int test = particles_everywhere->array_of_particles[5].particle_neighbours->nh->nNeighbours;
+// //     neighbours* List = particles_everywhere->array_of_particles[5].particle_neighbours->nh->list;
+// //     for(int i=0; i<test; i++) {
+// // 	int index = List->index;//particles_everywhere->array_of_particles[25].particle_neighbours->nh->list->index;
+// // 	printf("index = %d \n", index);
+// // 	List = List->next;
+// //     }
+// //     // Associate the computed neighbourhoods to each existing particle
+//     associate_neighborhood_to_particles(particles_everywhere, nh);
+//     
+//     
+//     // *** 3 *** TIME LOOP TO RESOLVE THE EQUATIONS
+// 
+//       computeDerivativesAllParticles(particles_everywhere, CUBIC);
+//       myFillData(data, particles_everywhere, extrema);
+//       draw_particles(domain_lim, data);
+// 
+// //     }
+  
+  
+  
+  
   // ***********************************************************************************************
   // ************************** HEAT EQUATION IN A SQUARE WITH DIRICHLET B.C. **********************
   // ***********************************************************************************************
+  int problem_choice = 2; // 1: heat equation with a hot boundary, 2: heat equation with a heat source in the center
+  
   
     // *** 1 *** ASSIGN POSITIONS, DENSITY, AND MASS TO EVERY PARTICLES (neighbourhoods not yet defined) + BOUNDARY CONDITIONS
   
     // Creation of particles in the domain
     int nbParticles_domain[2] = {(int) sqrt(NPTS_DOMAIN), (int) sqrt(NPTS_DOMAIN)}; // number of particles in each direction (WARNING: same number of particles should be chosen for the moment)
-    double domain_lim[4] = {0.0,1.0,0.0,1.0}; // limits of the computational domain
+    double dx = 0.5 * 1.0 / ((double)sqrt(NPTS_DOMAIN) - 1.0);
+    double domain_lim[4] = {0.0+dx,1.0-dx,0.0+dx,1.0-dx}; // limits of the computational domain
     int starting_index_part_in_domain = 0;
-    double args_init_function[1] = {0.0}; // value of the temperature to be imposed everywhere in the domain. This argument is passed to the "initFunction" routine which will specify the values of each particle quantity
     int size_values = 1; // scalar temperature field with a single component
-    
-    allParticles* particles_in_domain = create_particles_in_domain(nbParticles_domain, domain_lim, size_values, args_init_function, initFunction, starting_index_part_in_domain);
+    allParticles* particles_in_domain = NULL;
+    double alpha;
+    if (problem_choice == 1) {
+      double args_init_function[1] = {0.0}; // value of the temperature to be imposed everywhere in the domain. This argument is passed to the "initFunction" routine which will specify the values of each particle quantity
+      particles_in_domain = create_particles_in_domain(nbParticles_domain, domain_lim, size_values, args_init_function, initFunction, starting_index_part_in_domain);
+      alpha = 1.0;
+    }
+    else if (problem_choice == 2) {
+      double args_init_function[4] = {1.0, 0.1, 0.5, 0.5};
+      particles_in_domain = create_particles_in_domain(nbParticles_domain, domain_lim, size_values, args_init_function, initFunction_GaussianSource, starting_index_part_in_domain);
+      alpha = 1.0;
+    }
     
     // Creation of particles on the boundaries
+    allParticles* particles_on_boundaries;
     int nbBoundaries = 4;
     int nbParticles_boundaries[4] = {NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES}; // number of particles on each boundary (WARNING: same number of particles should be chosen for the moment)
     double boundaries_lim[4][4] = {{0.0, 0.0, 0.0, 1.0},
@@ -311,17 +422,22 @@ int main()
 				   {1.0, 1.0, 0.0, 1.0},
 				   {0.0, 1.0, 0.0, 0.0}};
     int starting_index_part_on_bound = NPTS_DOMAIN;
-    double values_Dirichlet[4] = {0.0, 0.0, 0.0, 100.0}; 
-    
-    allParticles* particles_on_boundaries = create_particles_on_boundaries(nbParticles_boundaries, (double *)boundaries_lim, size_values, nbBoundaries, values_Dirichlet, starting_index_part_on_bound);
+    if (problem_choice == 1) {
+      double values_Dirichlet[4] = {0.0, 0.0, 0.0, 100.0}; 
+      particles_on_boundaries = create_particles_on_boundaries(nbParticles_boundaries, (double *)boundaries_lim, size_values, nbBoundaries, values_Dirichlet, starting_index_part_on_bound);
+    }
+    else if (problem_choice == 2) {
+      double values_Dirichlet[4] = {0.0, 0.0, 0.0, 0.0}; 
+      particles_on_boundaries = create_particles_on_boundaries(nbParticles_boundaries, (double *)boundaries_lim, size_values, nbBoundaries, values_Dirichlet, starting_index_part_on_bound);
+    }
     
     // Assemble the particles in the domain and on the boundaries in a single structure, for the computation of the neighbourhoods just after
     allParticles* particles_everywhere = combine_two_particles_sets(particles_in_domain, particles_on_boundaries, IN_DOMAIN, ON_BOUNDARY);
     
     GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
     CHECK_MALLOC(data);
-    double extrema[2] = {0.0, 100.0};
-    myFillData(data, particles_everywhere, extrema);
+    double extrema[2] = {0.0, 1.0};
+//     myFillData(data, particles_everywhere, extrema);
 //     draw_particles(domain_lim, data);
     
     
@@ -334,42 +450,42 @@ int main()
     neighborhood* nh = options->nh;
     neighborhood_update_new(options, nh, particles_everywhere, 0);
     
-    int test = particles_everywhere->array_of_particles[25].particle_neighbours->nh->nNeighbours;
-    for(int i=0; i<test; i++) {
-	int index = particles_everywhere->array_of_particles[25].particle_neighbours->nh[i].index;
-// 	printf("index = %d \n", index);
-    }
-//     // Associate the computed neighbourhoods to each existing particle
-//     associate_neighborhood_to_particles(particles_everywhere, nh);
+    // Associate the computed neighbourhoods to each existing particle
+    associate_neighborhood_to_particles(particles_everywhere, nh);
     
     
     // *** 3 *** TIME LOOP TO RESOLVE THE EQUATIONS
 //      bov_window_t* window = NULL;
-//      bov_points_t *particles = NULL;
+//      bov_points_t* particles = NULL;
 //      create_window_animation(data, window, particles);
     
-    double alpha = 1.0;
+    // Time stepping scheme parameters
     double time = 0.0;
-    double time_max = 0.3;
-    double dt = 1.0E-5;
+    double dt = 1.0E-6;
+    double time_max = 200*dt;//0.001;
     int nb_time_step = 0;
     int nb_time_step_max = time_max / dt;
-    int print_every_time_step = 1000;
+    int print_every_time_step = 10;
     int size_solution_vector = (int)(nb_time_step_max / print_every_time_step) + 1;
     double* solution_vector = malloc(size_values*size_solution_vector*sizeof(double));
+
+    double args_init_function[4] = {1.0, 0.1, 0.5, 0.5};
+    
     
     while (time < time_max) {
       // Store the solution at every n-time steps in a vector for visualization afterwards
-      if (nb_time_step == nb_time_step_max) { //% print_every_time_step == 0) {
-// 	store_solution(solution_vector, particles_everywhere);
-	printf("------ Time step %d over %d -------\n", nb_time_step, nb_time_step_max+1);
-	myFillData(data, particles_everywhere, extrema);
-// 	double test = particles_everywhere->array_of_particles[25].values[0];
-// 	double test = particles_everywhere->array_of_particles[25].particle_derivatives->laplacian[0];
-	int test = particles_everywhere->array_of_particles[25].particle_neighbours->nh->nNeighbours;
-// 	printf("test = %d\n",test);
-//         display_particles(data, window, particles);
-	draw_particles(domain_lim, data);
+      if (nb_time_step%print_every_time_step == 0) {
+	printf("------ Time step %d over %d -------\n", nb_time_step, nb_time_step_max);
+	double T_SPH = particles_everywhere->array_of_particles[1225].values[0];
+	double* x_SPH = particles_everywhere->array_of_particles[1225].coordinates;
+	printf("T_SPH = %2.10f @ (x,y) = (%2.3f, %2.3f) \n", T_SPH, x_SPH[0], x_SPH[1]);
+	double exact_solution = solution_Fourier_series_Gaussian_source(x_SPH, time, args_init_function, 10);
+	printf("T_exact = %2.10f @ (x,y) = (%2.3f, %2.3f) \n", exact_solution, x_SPH[0], x_SPH[1]);
+// 	double test_2 = particles_everywhere->array_of_particles[1225].particle_derivatives->laplacian[0];
+// 	printf(">>>>>>>>>>>> Laplacian = %2.10f <<<<<<<<<<<\n", test_2);
+// 	myFillData(data, particles_everywhere, extrema);
+//         display_particles(data, window, particles, 0);
+// 	draw_particles(domain_lim, data);
       }
       // Compute derivatives of all the particles inside the domain, in particular the Laplacian here
       computeDerivativesAllParticles(particles_everywhere, CUBIC);
@@ -379,8 +495,21 @@ int main()
 //       
       time += dt;
       nb_time_step++;
+      if (nb_time_step == nb_time_step_max) { //% print_every_time_step == 0) {
+// 	store_solution(solution_vector, particles_everywhere);
+// 	myFillData(data, particles_everywhere, extrema);
+// // 	double test = particles_everywhere->array_of_particles[25].values[0];
+// // 	double test = particles_everywhere->array_of_particles[25].particle_derivatives->laplacian[0];
+// // 	printf("test = %d\n",test);
+//         display_particles(data, window, particles, 0);
+// 	draw_particles(domain_lim, data);
+      }
       // NOTE: No need to update the positions of the particles or to update the neighbourhoods since the particles are fixed
     }
+    myFillData(data, particles_everywhere, extrema);
+    draw_particles(domain_lim, data);
+//     myFillData(data, particles_everywhere, extrema);
+//     display_particles(data, window, particles, 1);
     
     
     
