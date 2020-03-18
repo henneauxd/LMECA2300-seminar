@@ -10,8 +10,8 @@
 
 #define M_PI 3.14159265358979323846
 
-extern int NPTS_DOMAIN;
-extern int NPTS_BOUNDARIES;
+// extern int NPTS_DOMAIN;
+// extern int NPTS_BOUNDARIES;
 
 enum fieldNames {
   Density = 1,
@@ -53,6 +53,8 @@ typedef struct mySingleParticle {
 typedef struct allParticles {
   mySingleParticle* array_of_particles;
   int nb_particles;
+  int nb_particles_domain;
+  int nb_particles_boundaries;
   int* index_part_in_domain; // array of the indices of all particles inside the domain
   int* index_part_on_boundaries; // array of the indices of all particles on the boundaries
 //   int* index_part_global; // array of the indices of all particles (domain + boundaries)

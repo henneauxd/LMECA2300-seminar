@@ -98,6 +98,8 @@ allParticles* create_particles_in_domain(int* nbParticles, double* domain_lim, i
       }
   }
   my_particles->nb_particles = i;
+  my_particles->nb_particles_domain = i;
+  my_particles->nb_particles_boundaries = 0;
   my_particles->index_part_in_domain = index_domain;
   my_particles->index_part_on_boundaries = NULL;
 
@@ -147,6 +149,8 @@ allParticles* create_particles_on_boundaries(int* nbParticles, double* boundarie
     }
   }
   my_particles->nb_particles = i;
+  my_particles->nb_particles_domain = 0;
+  my_particles->nb_particles_boundaries = i;
   my_particles->index_part_in_domain = NULL;
   my_particles->index_part_on_boundaries = index_domain;
 
@@ -313,15 +317,25 @@ void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_pa
   double * grad_part = local_part->particle_derivatives->gradient;
   double * laplacian_part = local_part->particle_derivatives->laplacian;
 
+  // Reset all the derivatives to zero before computing their new values
+  // --- Divergence ---
+  if (myPart->size_values == 2) divergence_part[0] = 0.0;
+  // --- Gradient & Laplacian ---
+  for (int k=0; k < myPart->size_values; k++) {
+    grad_part[2*k] = 0.0;							      
+    grad_part[2*k+1] = 0.0;
+    laplacian_part[k] = 0.0;
+  }
+      
   int nNeigh = local_part->particle_neighbours->nh->nNeighbours;
   neighbours* List = local_part->particle_neighbours->nh->list;
   double kh = local_part->particle_neighbours->kh;
   for (int j = 0; j < nNeigh; j++) {
       int index_j = List->index;
       double d_ij = List->distance; // WARNING: distance = 0 in 1-D if computed this way, why???
-      double d_x_ij =  myPart[index_j].coordinates[0] - local_part->coordinates[0];//  data[index_node2][0] - data[i][0];
+      double d_x_ij =  myPart[index_j].coordinates[0] - local_part->coordinates[0];// WARNING: absolute value or not here?
 //       double d_ij = fabs(d_x_ij); // only valid in 1-D, should use List->distance instead but = 0 for the moment (see line above)
-      double d_y_ij = myPart[index_j].coordinates[1] - local_part->coordinates[1];//data[index_node2][1] - data[i][1];
+      double d_y_ij =  myPart[index_j].coordinates[1] - local_part->coordinates[1];// WARNING: absolute value or not here?
       
       double weight_x;
       double weight_y;
@@ -356,7 +370,7 @@ void computeDerivativesOfParticleQuantity(mySingleParticle* myPart, int index_pa
 	// d^2/dx^2 value_k + d^2/dy^2 value_k
 	laplacian_part[k] += 2.0 * (myPart[index_j].mass / myPart[index_j].density) * (local_part->values[k] - myPart[index_j].values[k]) * (d_x_ij * weight_x + d_y_ij * weight_y) /(d_ij*d_ij);
       }
-//       if (index_part == 10 && d_ij == 0) printf("index_j = %d \n", index_j);
+//       if (index_part == 1225) printf("index_j = %2.6f \n", laplacian_part[0]);
 //       double test = 2.0 * (myPart[index_j].mass / myPart[index_j].density) * (local_part->values[0] - myPart[index_j].values[0]) * (d_x_ij * weight_x + d_y_ij * weight_y) /(d_ij*d_ij);
 //       if (index_part == 5) printf("laplacian_part[k] = %2.6f \n",  d_ij);//laplacian_part[0]);
       
@@ -393,7 +407,7 @@ void computeDerivativesAllParticles(allParticles* myPart, kernelType kType) {
   // WARNING: this routine only valid for scalar quantity for the moment
 //   printf("\ni  (X,Y)			f(x)		Grad_x			Grad_y			Laplacian\n\n");
   int* index_in_domain = myPart->index_part_in_domain;
-  int nbPart = 50*50;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
+  int nbPart = myPart->nb_particles_domain;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
   for (int i=0; i<nbPart; i++) {
       int local_index = index_in_domain[i];
       computeDerivativesOfParticleQuantity(myPart->array_of_particles, local_index, kType);
@@ -430,7 +444,7 @@ allParticles* combine_two_particles_sets(allParticles* part1, allParticles* part
   else if (pType2 == ON_BOUNDARY) index_part2 = part2->index_part_on_boundaries;
 
   part_combined->array_of_particles = malloc(size_part_combined*sizeof(mySingleParticle));
-  
+
   for (int i=0; i < size_part1; i++) {
     int local_index = index_part1[i];
     clone_single_particle(&(part_combined->array_of_particles[local_index]), &(part1->array_of_particles[i]));
@@ -446,10 +460,12 @@ allParticles* combine_two_particles_sets(allParticles* part1, allParticles* part
   if (pType1 == IN_DOMAIN) {
     part_combined->index_part_in_domain = index_part1;
     part_combined->index_part_on_boundaries = index_part2;
+    part_combined->nb_particles_domain = part1->nb_particles_domain;
   }
   else{
     part_combined->index_part_in_domain = index_part2;
     part_combined->index_part_on_boundaries = index_part1;
+    part_combined->nb_particles_boundaries = part2->nb_particles_boundaries;
   } 
 }
 
@@ -471,8 +487,8 @@ void associate_neighborhood_to_particles(allParticles* part, neighborhood* nh) {
   
    
   
-  int nbPart_domain = 50*50;//NPTS_DOMAIN;
-  int nbPart_boundary = 4*100;//NPTS_BOUNDARIES;
+  int nbPart_domain = part->nb_particles_domain;//NPTS_DOMAIN;
+  int nbPart_boundary = part->nb_particles_boundaries;//NPTS_BOUNDARIES;
   
   if(part->index_part_in_domain) { 
     index_part_domain = part->index_part_in_domain;
@@ -495,7 +511,7 @@ void associate_neighborhood_to_particles(allParticles* part, neighborhood* nh) {
 
 void integrate_equation(allParticles* part, double dt, double alpha) {
   int* index_in_domain = part->index_part_in_domain;
-  int nbPart = 50*50;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
+  int nbPart = part->nb_particles_domain;//NPTS_DOMAIN*NPTS_DOMAIN;//sizeof(index_in_domain)/sizeof(index_in_domain[0]);
   for (int i = 0; i<nbPart; i++) {
       int local_index = index_in_domain[i];
       part->array_of_particles[local_index].values[0] += dt*alpha*part->array_of_particles[local_index].particle_derivatives->laplacian[0];

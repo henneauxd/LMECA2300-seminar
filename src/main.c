@@ -7,10 +7,11 @@
 // static int NPTS_DOMAIN = 10*10;
 // int NPTS = 10*10 + 4*10;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
 
-int NPTS_BOUNDARIES = 100;
-int NPTS_DOMAIN = 50*50;
-int NPTS = 50*50 + 4*100;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
+// int NPTS_BOUNDARIES = 100;
+// int NPTS_DOMAIN = 50*50;
+// int NPTS = 50*50 + 4*100;//NPTS_DOMAIN + 4*NPTS_BOUNDARIES;
 
+int NPTS;
 // for v, a floating point value between 0 and 1, this function fills color with
 // the improved jet colormap color corresponding to v
 static void colormap(float v, float color[3])
@@ -42,7 +43,7 @@ static void myColormap(float v, float color[3], float v_max, float v_min)
 
 // function to fill the data table of the nPoints particles positions, speeds, colors and transparency and the coord table with the nPoints particles positions used to draw;
 // data[i][0] == coord[i][0] && data[i][1] == coord[i][1]
-void fillData(GLfloat(* data)[8])
+void fillData(GLfloat(* data)[8], int nbParticles)
 {
 // 	float rmax = 100.0 * sqrtf(2.0f);
   float rmax = 1.0 * sqrtf(2.0f);
@@ -78,7 +79,7 @@ void fillData(GLfloat(* data)[8])
 	
 	double x_lim[4] = {0.0, 1.0, 0.0, 1.0};
 	int i=0;
-	int nbPart_x = sqrt(NPTS);
+	int nbPart_x = sqrt(nbParticles);
 	int nbPart_y = nbPart_x;
 	for (int ind_y = 0; ind_y < nbPart_y; ind_y++) {
 	  for (int ind_x = 0; ind_x < nbPart_x; ind_x++) {
@@ -89,7 +90,7 @@ void fillData(GLfloat(* data)[8])
 	    double mass = 1.0;
 	    double density = 1.0;
 	    
-// 	    init1DSegmentWithParticles(x_lim, coord, values, &mass, &density, NPTS, i, 1);
+// 	    init1DSegmentWithParticles(x_lim, coord, values, &mass, &density, nbParticles, i, 1);
 	    initSquareWithParticles(x_lim, coord, values, &mass, &density, nbPart_x, nbPart_y, ind_x, ind_y, 1);
 	    data[i][0] = coord[0];
 	    data[i][1] = coord[1];
@@ -155,12 +156,12 @@ void myFillData(GLfloat(* data)[8], allParticles* my_array_of_particles, double*
 	}
 }
 
-void draw_particles(double* x_lim, GLfloat(* data)[8]) {
+void draw_particles(double* x_lim, GLfloat(* data)[8], int nbParticles) {
       bov_window_t* window = bov_window_new(1024, 780, "ANM Project: SPH");
       bov_window_set_color(window, (GLfloat[]){0.9f, 0.85f, 0.8f, 0.0f});
 
       /* send data to GPU, and receive reference to those data in a points object */
-      bov_points_t *particles = bov_particles_new(data, NPTS, GL_STATIC_DRAW);
+      bov_points_t *particles = bov_particles_new(data, nbParticles, GL_STATIC_DRAW);
 
       /* setting particles appearance */
       bov_points_set_width(particles, 0.01);
@@ -201,12 +202,12 @@ void draw_particles(double* x_lim, GLfloat(* data)[8]) {
       bov_window_delete(window);
 }
 
-void create_window_animation(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles) {
+void create_window_animation(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles, int nbParticles) {
       window = bov_window_new(1024, 780, "ANM Project: SPH");
       bov_window_set_color(window, (GLfloat[]){0.9f, 0.85f, 0.8f, 0.0f});
 
       /* send data to GPU, and receive reference to those data in a points object */
-      particles = bov_particles_new(data, NPTS, GL_STATIC_DRAW);
+      particles = bov_particles_new(data, nbParticles, GL_STATIC_DRAW);
 
       /* setting particles appearance */
       bov_points_set_width(particles, 0.01);
@@ -235,9 +236,9 @@ void create_window_animation(GLfloat(* data)[8], bov_window_t* window, bov_point
       }
 }
 
-void display_particles(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles, int end) {
+void display_particles(GLfloat(* data)[8], bov_window_t* window, bov_points_t *particles, int end, int nbParticles) {
   float transition_time = 1.0;
-  bov_points_t* new_particles = bov_particles_update(particles,data,NPTS);
+  bov_points_t* new_particles = bov_particles_update(particles,data,nbParticles);
   bov_window_t* new_window = window;
   double tbegin = bov_window_get_time(new_window);
   if (!end) {
@@ -254,8 +255,35 @@ void display_particles(GLfloat(* data)[8], bov_window_t* window, bov_points_t *p
   }
 }
 
+
+void display_neighbourhood_one_particle(allParticles* allPart, int index_part, int nbParticles) {
+  mySingleParticle* local_part = &(allPart->array_of_particles[index_part]);
+  int nNeigh = local_part->particle_neighbours->nh->nNeighbours;
+  neighbours* List = local_part->particle_neighbours->nh->list;
+  double kh = local_part->particle_neighbours->kh;
+  
+  local_part->values[0] = 1.0;
+  for (int j = 0; j < nNeigh; j++) {
+      int index_j = List->index;
+      printf("index = %d \n", index_j);
+      allPart->array_of_particles[index_j].values[0] = 0.5;
+      List = List->next;
+  }
+  double extrema[2] = {0.0, 1.0};
+  GLfloat(*data)[8] = malloc(sizeof(data[0]) * nbParticles);
+  CHECK_MALLOC(data);
+  myFillData(data, allPart, extrema);
+  double domain_lim[4] = {0.0, 1.0, 0.0, 1.0};
+  draw_particles(domain_lim, data, nbParticles);
+}
+
 int main()
 {
+      int nb_particles_domain = 50*50;
+      int nb_particles_boundaries = 100;
+      int nbBoundaries = 4;
+      int total_nb_particles = nb_particles_domain + nbBoundaries*nb_particles_boundaries;
+      NPTS = total_nb_particles;
 // 	GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
 // 	CHECK_MALLOC(data);
 // 	// Seed the random
@@ -287,7 +315,7 @@ int main()
 // 	
 // 	// Draw particles with color related to the derivatives of the quantity they carry
 // 	myFillData(data, my_array_of_particles->array_of_particles);
-// 	draw_particles(domain_lim, data);
+// 	draw_particles(domain_lim, data, total_nb_particles);
 // 
 // 	neighborhood_options_delete(options,nh);
 // 
@@ -352,7 +380,7 @@ int main()
 //     CHECK_MALLOC(data);
 //     double extrema[2] = {0.0, 2.0};
 //     myFillData(data, particles_everywhere, extrema);
-// //     draw_particles(domain_lim, data);
+// //     draw_particles(domain_lim, data, total_nb_particles);
 //     
 //     
 //     // *** 2 *** CREATION OF THE NEIGHBOURHOODS OF EACH PARTICLE (in the domain and on the boundaries)
@@ -395,12 +423,13 @@ int main()
     // *** 1 *** ASSIGN POSITIONS, DENSITY, AND MASS TO EVERY PARTICLES (neighbourhoods not yet defined) + BOUNDARY CONDITIONS
   
     // Creation of particles in the domain
-    int nbParticles_domain[2] = {(int) sqrt(NPTS_DOMAIN), (int) sqrt(NPTS_DOMAIN)}; // number of particles in each direction (WARNING: same number of particles should be chosen for the moment)
-    double dx = 0.5 * 1.0 / ((double)sqrt(NPTS_DOMAIN) - 1.0);
+    allParticles* particles_in_domain = NULL;
+
+    int nbParticles_domain[2] = {(int) sqrt(nb_particles_domain), (int) sqrt(nb_particles_domain)}; // number of particles in each direction (WARNING: same number of particles should be chosen for the moment)
+    double dx = 0.5 * 1.0 / ((double)sqrt(nb_particles_domain) - 1.0);
     double domain_lim[4] = {0.0+dx,1.0-dx,0.0+dx,1.0-dx}; // limits of the computational domain
     int starting_index_part_in_domain = 0;
     int size_values = 1; // scalar temperature field with a single component
-    allParticles* particles_in_domain = NULL;
     double alpha;
     if (problem_choice == 1) {
       double args_init_function[1] = {0.0}; // value of the temperature to be imposed everywhere in the domain. This argument is passed to the "initFunction" routine which will specify the values of each particle quantity
@@ -414,14 +443,14 @@ int main()
     }
     
     // Creation of particles on the boundaries
-    allParticles* particles_on_boundaries;
-    int nbBoundaries = 4;
-    int nbParticles_boundaries[4] = {NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES, NPTS_BOUNDARIES}; // number of particles on each boundary (WARNING: same number of particles should be chosen for the moment)
+    allParticles* particles_on_boundaries = NULL;
+
+    int nbParticles_boundaries[4] = {nb_particles_boundaries, nb_particles_boundaries, nb_particles_boundaries, nb_particles_boundaries}; // number of particles on each boundary (WARNING: same number of particles should be chosen for the moment)
     double boundaries_lim[4][4] = {{0.0, 0.0, 0.0, 1.0},
 				   {0.0, 1.0, 1.0, 1.0},
 				   {1.0, 1.0, 0.0, 1.0},
 				   {0.0, 1.0, 0.0, 0.0}};
-    int starting_index_part_on_bound = NPTS_DOMAIN;
+    int starting_index_part_on_bound = nb_particles_domain;
     if (problem_choice == 1) {
       double values_Dirichlet[4] = {0.0, 0.0, 0.0, 100.0}; 
       particles_on_boundaries = create_particles_on_boundaries(nbParticles_boundaries, (double *)boundaries_lim, size_values, nbBoundaries, values_Dirichlet, starting_index_part_on_bound);
@@ -434,11 +463,11 @@ int main()
     // Assemble the particles in the domain and on the boundaries in a single structure, for the computation of the neighbourhoods just after
     allParticles* particles_everywhere = combine_two_particles_sets(particles_in_domain, particles_on_boundaries, IN_DOMAIN, ON_BOUNDARY);
     
-    GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
+    GLfloat(*data)[8] = malloc(sizeof(data[0]) * total_nb_particles);
     CHECK_MALLOC(data);
     double extrema[2] = {0.0, 1.0};
 //     myFillData(data, particles_everywhere, extrema);
-//     draw_particles(domain_lim, data);
+//     draw_particles(domain_lim, data, total_nb_particles);
     
     
     // *** 2 *** CREATION OF THE NEIGHBOURHOODS OF EACH PARTICLE (in the domain and on the boundaries)
@@ -448,24 +477,28 @@ int main()
     double maxspeed = 0.0;
     neighborhood_options* options = neighborhood_options_init(timestep, maxspeed);
     neighborhood* nh = options->nh;
-    neighborhood_update_new(options, nh, particles_everywhere, 0);
     
+    neighborhood_update_new(options, nh, particles_everywhere, 0);
+      
     // Associate the computed neighbourhoods to each existing particle
     associate_neighborhood_to_particles(particles_everywhere, nh);
+    
+    int index_particle_to_check = nb_particles_domain * 0.5 - (int)(nbParticles_domain[0]*0.5);
+//     display_neighbourhood_one_particle(particles_everywhere, index_particle_to_check, total_nb_particles);
     
     
     // *** 3 *** TIME LOOP TO RESOLVE THE EQUATIONS
 //      bov_window_t* window = NULL;
 //      bov_points_t* particles = NULL;
-//      create_window_animation(data, window, particles);
+//      create_window_animation(data, window, particles, total_nb_particles);
     
     // Time stepping scheme parameters
     double time = 0.0;
-    double dt = 1.0E-6;
+    double dt = 1.0E-5;
     double time_max = 200*dt;//0.001;
     int nb_time_step = 0;
     int nb_time_step_max = time_max / dt;
-    int print_every_time_step = 10;
+    int print_every_time_step = 20;
     int size_solution_vector = (int)(nb_time_step_max / print_every_time_step) + 1;
     double* solution_vector = malloc(size_values*size_solution_vector*sizeof(double));
 
@@ -476,16 +509,18 @@ int main()
       // Store the solution at every n-time steps in a vector for visualization afterwards
       if (nb_time_step%print_every_time_step == 0) {
 	printf("------ Time step %d over %d -------\n", nb_time_step, nb_time_step_max);
-	double T_SPH = particles_everywhere->array_of_particles[1225].values[0];
-	double* x_SPH = particles_everywhere->array_of_particles[1225].coordinates;
+	double T_SPH = particles_everywhere->array_of_particles[index_particle_to_check].values[0];
+	double* x_SPH = particles_everywhere->array_of_particles[index_particle_to_check].coordinates;
 	printf("T_SPH = %2.10f @ (x,y) = (%2.3f, %2.3f) \n", T_SPH, x_SPH[0], x_SPH[1]);
-	double exact_solution = solution_Fourier_series_Gaussian_source(x_SPH, time, args_init_function, 10);
-	printf("T_exact = %2.10f @ (x,y) = (%2.3f, %2.3f) \n", exact_solution, x_SPH[0], x_SPH[1]);
-// 	double test_2 = particles_everywhere->array_of_particles[1225].particle_derivatives->laplacian[0];
-// 	printf(">>>>>>>>>>>> Laplacian = %2.10f <<<<<<<<<<<\n", test_2);
+	double T_exact = solution_Fourier_series_Gaussian_source(x_SPH, time, args_init_function, 10);
+	printf("T_exact = %2.10f @ (x,y) = (%2.3f, %2.3f) \n", T_exact, x_SPH[0], x_SPH[1]);
+	double relative_error = (fabs(T_SPH-T_exact)/T_exact) * 100;
+	printf("||error|| = %2.10f percent \n", relative_error);
+// 	double test_2 = particles_everywhere->array_of_particles[index_particle_to_check].particle_derivatives->laplacian[0];
+// 	printf("Laplacian_SPH = %2.10f <<<<<<<<<<<\n", test_2);
 // 	myFillData(data, particles_everywhere, extrema);
-//         display_particles(data, window, particles, 0);
-// 	draw_particles(domain_lim, data);
+//         display_particles(data, window, particles, 0, total_nb_particles);
+// 	draw_particles(domain_lim, data, total_nb_particles);
       }
       // Compute derivatives of all the particles inside the domain, in particular the Laplacian here
       computeDerivativesAllParticles(particles_everywhere, CUBIC);
@@ -501,15 +536,15 @@ int main()
 // // 	double test = particles_everywhere->array_of_particles[25].values[0];
 // // 	double test = particles_everywhere->array_of_particles[25].particle_derivatives->laplacian[0];
 // // 	printf("test = %d\n",test);
-//         display_particles(data, window, particles, 0);
-// 	draw_particles(domain_lim, data);
+//         display_particles(data, window, particles, 0, total_nb_particles);
+// 	draw_particles(domain_lim, data, total_nb_particles);
       }
       // NOTE: No need to update the positions of the particles or to update the neighbourhoods since the particles are fixed
     }
     myFillData(data, particles_everywhere, extrema);
-    draw_particles(domain_lim, data);
+    draw_particles(domain_lim, data, total_nb_particles);
 //     myFillData(data, particles_everywhere, extrema);
-//     display_particles(data, window, particles, 1);
+//     display_particles(data, window, particles, 1, total_nb_particles);
     
     
     
@@ -517,7 +552,7 @@ int main()
 //     GLfloat(*data)[8] = malloc(sizeof(data[0]) * NPTS);
 //     CHECK_MALLOC(data);
 //     myFillData(data, particles_everywhere->array_of_particles);
-//     draw_particles(domain_lim, data);
+//     draw_particles(domain_lim, data, total_nb_particles);
 
     neighborhood_options_delete(options,nh);
 

@@ -510,10 +510,10 @@ neighborhood_options* neighborhood_options_init(double timestep, double maxspeed
 
 	int radius_algorithm = 1;
 
-	options->half_length = 100;
-	options->use_cells = 1;
-	options->use_improved_method = 1;
-	options->use_verlet = 1;
+	options->half_length = 1;
+	options->use_cells = 0;
+	options->use_improved_method = 0;
+	options->use_verlet = 0;
 	options->optimal_verlet_steps = 0;
 	options->kh = compute_kh(radius_algorithm); //*(x_max - x_min);// * 2 * options->half_length; // WARNING: David's note: give a way too high kh for my tests...
 	options->L = 0.0;
