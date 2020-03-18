@@ -285,7 +285,7 @@ void init1DSegmentWithParticles(double* x_lim, double* coord, double* values, do
   *mass = *density * (delta*delta);
 }
 
-double myFunctionToDerive(double* x) 
+double myFunctionToDerive(double* x, double* args) 
 {
    return x[0]*x[0]; 
 }

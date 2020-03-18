@@ -80,7 +80,7 @@ void initValuesParticles(double* coord, double *values, double* args, int size_v
 void initSquareWithParticles(double* x_lim, double* coord, double* values, double* mass, double* density, int nbPart_x, int nbPart_y, int index_x, int index_y, int size_values);
 
 // Function assigning the values of the quantity carried by each particle based on the coordinates
-double myFunctionToDerive(double* x);
+double myFunctionToDerive(double* x, double* args);
 
 double initFunction(double* x, double* args); 
 
